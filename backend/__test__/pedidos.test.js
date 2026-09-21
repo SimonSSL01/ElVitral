@@ -45,6 +45,42 @@ describe('Pedidos', () => {
     expect(res.body.id).toBe(99);
   });
 
+  test('registra salidas de inventario al convertir una cotizacion en pedido', async () => {
+    getUserFromRequest.mockReturnValue({ id: 'user-1', rol: 'usuario' });
+
+    query
+      .mockResolvedValueOnce([{
+        id: 20,
+        usuario_id: 'user-1',
+        email_cliente: 'cliente@test.com',
+        total: 250000,
+        estado: 'vigente',
+      }])
+      .mockResolvedValueOnce({ insertId: 99 })
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce([{
+        producto_id: 10,
+        cantidad: 2,
+        descripcion: 'Vidrio templado',
+      }])
+      .mockResolvedValueOnce({})
+      .mockResolvedValueOnce({});
+
+    const res = await request(app)
+      .post('/api/pedidos')
+      .send({ cotizacion_id: 20 });
+
+    expect(res.status).toBe(201);
+    expect(query).toHaveBeenCalledWith(
+      'INSERT INTO inventario (producto_id, cantidad, tipo_movimiento, descripcion, pedido_id, usuario_id) VALUES (?, ?, ?, ?, ?, ?)',
+      [10, 2, 'salida', 'Salida por pedido #99: Vidrio templado', 99, 'user-1']
+    );
+    expect(query).toHaveBeenCalledWith(
+      'UPDATE productos SET stock = stock - ? WHERE id = ?',
+      [2, 10]
+    );
+  });
+
   test('rechaza pedido sin autenticacion', async () => {
     getUserFromRequest.mockReturnValue(null);
 
